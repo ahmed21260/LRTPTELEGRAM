@@ -1,0 +1,35 @@
+{
+  "name": "lr-assist-bot",
+  "version": "1.0.0",
+  "description": "Bot Telegram LR ASSIST pour la gestion ferroviaire",
+  "main": "start.js",
+  "scripts": {
+    "start": "node start.js",
+    "dev": "nodemon start.js",
+    "test": "node test-bot.js",
+    "logs": "tail -f bot/logs/bot.log"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "railway",
+    "safety",
+    "monitoring"
+  ],
+  "author": "LR ASSIST Team",
+  "license": "MIT",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.64.0",
+    "axios": "^1.6.0",
+    "socket.io-client": "^4.7.0",
+    "fs-extra": "^11.1.0",
+    "winston": "^3.11.0",
+    "moment": "^2.29.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+} 
