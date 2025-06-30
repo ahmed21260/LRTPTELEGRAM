@@ -21,6 +21,9 @@ const PORT = process.env.PORT || 3000;
 // Servir le dashboard statique
 app.use(express.static(path.join(__dirname, 'dashboard')));
 
+// Servir les photos
+app.use('/photos', express.static(path.join(__dirname, 'data', 'photos')));
+
 // API REST
 app.get('/api/alerts', (req, res) => {
   const data = loadData();
@@ -42,6 +45,48 @@ app.get('/api/positions', (req, res) => {
     pkEstime: p.pkEstime || false
   }));
   res.json(positions);
+});
+
+app.get('/api/messages', (req, res) => {
+  const data = loadData();
+  const { userId } = req.query;
+  let messages = data.messages || [];
+  if (userId) messages = messages.filter(m => m.userId === userId);
+  res.json(messages);
+});
+
+app.get('/api/users', (req, res) => {
+  const data = loadData();
+  const users = {};
+  
+  // Extraire les utilisateurs uniques des positions
+  (data.locations || []).forEach(loc => {
+    if (loc.userId && loc.userName) {
+      users[loc.userId] = {
+        userId: loc.userId,
+        userName: loc.userName,
+        lastPosition: loc,
+        lastSeen: loc.timestamp
+      };
+    }
+  });
+  
+  // Mettre à jour avec les derniers messages
+  (data.messages || []).forEach(msg => {
+    if (msg.userId && msg.userName) {
+      if (!users[msg.userId]) {
+        users[msg.userId] = {
+          userId: msg.userId,
+          userName: msg.userName,
+          lastSeen: msg.timestamp
+        };
+      } else if (msg.timestamp > users[msg.userId].lastSeen) {
+        users[msg.userId].lastSeen = msg.timestamp;
+      }
+    }
+  });
+  
+  res.json(Object.values(users));
 });
 
 // Instancier la classe RailwayAccessPortals une seule fois
