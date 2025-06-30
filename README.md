@@ -228,6 +228,16 @@ Le bot est conçu pour être facilement mis à jour :
 - **Migration transparente** des configurations
 - **Compatibilité ascendante** maintenue
 
+## 👤 Pour les opérateurs et superviseurs
+
+### Pour les opérateurs :
+- Utilisez Telegram pour envoyer votre position, des photos et des alertes.
+- Cliquez sur le lien Geoportail pour visualiser l'accès SNCF le plus proche.
+
+### Pour les superviseurs :
+- Ouvrez le dashboard web Railway pour tout visualiser en temps réel.
+- Utilisez l'API pour exporter ou intégrer les données.
+
 ---
 
 **🚦 LR ASSIST - L'innovation au service de la sécurité ferroviaire** 

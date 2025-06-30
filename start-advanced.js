@@ -333,68 +333,42 @@ bot.on('location', async (msg) => {
   const { latitude, longitude } = msg.location;
   
   try {
-    console.log('📍 Traitement localisation chantier...');
-    
     // Calculate PK SNCF
     const pkResult = await geoportal.calculatePKSNCF(latitude, longitude);
-    
     // Find nearest access portal
     const accessPortal = await accessPortals.findNearestAccessPortal(latitude, longitude, 'emergency');
-    
-    // Get railway info
-    const railwayInfo = await geoportal.getRailwayLineInfo(latitude, longitude);
-    const infrastructure = await geoportal.getNearbyInfrastructure(latitude, longitude, 2000);
-    
     // Save location
     let data = loadData();
     data.locations.push({
       userId, userName, latitude, longitude,
-      pkSNCF: pkResult.pk, lineId: pkResult.lineId, lineName: pkResult.lineName,
-      confidence: pkResult.confidence, distance: pkResult.distance,
-      method: pkResult.method, railwayInfo, infrastructure,
+      pkSNCF: pkResult.pk,
+      pkEstime: pkResult.method && pkResult.method.toLowerCase().includes('estimation'),
+      confidence: pkResult.confidence,
+      distance: pkResult.distance,
+      method: pkResult.method,
       accessPortal, timestamp: Date.now(), chatId
     });
-    
-    data.messages.push({
-      userId, userName,
-      message: `📍 Position chantier - ${pkResult.pk} (${pkResult.lineName})`,
-      type: 'location', status: 'normal',
-      location: { latitude, longitude, pkSNCF: pkResult.pk, lineName: pkResult.lineName },
-      chatId, timestamp: Date.now()
-    });
     saveData(data);
-    
-    // Send detailed confirmation
-    const geoUrl = `https://www.geoportail.gouv.fr/carte?c=${longitude},${latitude}&z=19&l=TRANSPORTNETWORKS.RAILWAYS`;
-    
-    let locationMsg = `📍 *Position chantier confirmée*\n\n` +
-      `🚦 *Point Kilométrique SNCF:*\n` +
-      `• PK: \`${pkResult.pk}\`\n` +
-      `• Ligne: ${pkResult.lineName}\n` +
-      `• Direction: ${railwayInfo.direction}\n` +
-      `• Confiance: ${pkResult.confidence}\n` +
-      `• Distance: ${pkResult.distance ? `${Math.round(pkResult.distance)}m` : 'N/A'}\n\n` +
-      `🚪 *Portail d'accès le plus proche:*\n` +
-      `• Nom: ${accessPortal.name}\n` +
-      `• Type: ${accessPortal.type}\n` +
-      `• Distance: ${accessPortal.distance}m\n` +
-      `• Statut: ${accessPortal.status}\n\n` +
-      `🏗️ *Infrastructure proche:*\n`;
-    
-    if (infrastructure.stations.length > 0) {
-      locationMsg += `• Gares: ${infrastructure.stations.length}\n`;
+    // Message PK
+    let pkMsg = `• PK: ${pkResult.pk}`;
+    if (pkResult.method && pkResult.method.toLowerCase().includes('estimation')) {
+      pkMsg += " (estimé)";
     }
-    if (infrastructure.signals.length > 0) {
-      locationMsg += `• Signaux: ${infrastructure.signals.length}\n`;
+    // Message portail
+    let portalMsg = '';
+    if (accessPortal && accessPortal.name === 'Aucun portail SNCF proche') {
+      portalMsg = `🚫 Aucun portail SNCF n'est disponible à proximité (moins de 5 km).`;
+    } else {
+      portalMsg = `🚪 Portail d'accès SNCF le plus proche :\n` +
+        `• Nom: ${accessPortal.name}\n` +
+        `• Type: ${accessPortal.type || 'N/A'}\n` +
+        `• Distance: ${accessPortal.distance !== null ? accessPortal.distance + 'm' : 'N/A'}\n` +
+        `• Statut: ${accessPortal.status || 'N/A'}\n` +
+        `• Confiance: ${accessPortal.confidence || 'N/A'}\n` +
+        `• Équipements: ${(accessPortal.equipment && accessPortal.equipment.length > 0) ? accessPortal.equipment.slice(0, 3).map(eq => `- ${eq}`).join(' ') : 'N/A'}\n` +
+        `• Contacts d'urgence: SNCF ${accessPortal.emergencyContacts ? accessPortal.emergencyContacts.sncf : '3635'}, Secours ${accessPortal.emergencyContacts ? accessPortal.emergencyContacts.secours : '112'}`;
     }
-    
-    locationMsg += `\n🔗 [Voir sur Geoportail](${geoUrl})`;
-    
-    bot.sendMessage(chatId, locationMsg, { 
-      parse_mode: 'Markdown',
-      ...mainMenu 
-    });
-    
+    bot.sendMessage(chatId, `📍 Position enregistrée :\n${pkMsg}\n\n${portalMsg}`, { parse_mode: 'Markdown', ...mainMenu });
   } catch (error) {
     console.error('❌ Erreur localisation:', error);
     bot.sendMessage(chatId, "❌ Erreur traitement position. Réessayez.", mainMenu);

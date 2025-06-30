@@ -1,0 +1,63 @@
+/* dashboard.css - LR RAIL ASSIST */
+
+body {
+  font-family: 'Inter', Arial, sans-serif;
+}
+
+#map {
+  min-height: 320px;
+  height: 320px;
+  max-height: 400px;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Lightbox */
+#lightbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+#lightbox-img {
+  box-shadow: 0 8px 32px #0008;
+  border-radius: 0.5rem;
+  max-width: 90vw;
+  max-height: 80vh;
+}
+#lightbox-close {
+  top: 2rem;
+  right: 2rem;
+  position: absolute;
+  background: none;
+  border: none;
+  font-size: 2.5rem;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Scrollbar custom */
+::-webkit-scrollbar {
+  width: 8px;
+  background: #e5e7eb;
+}
+::-webkit-scrollbar-thumb {
+  background: #a1a1aa;
+  border-radius: 4px;
+}
+
+/* Badge alerte */
+#badge-alert {
+  animation: badge-blink 1s infinite alternate;
+}
+@keyframes badge-blink {
+  from { background: #dc2626; }
+  to { background: #f87171; }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  aside { width: 100px !important; }
+  #dashboard-content { padding: 0.5rem !important; }
+  #map { height: 180px; }
+} 

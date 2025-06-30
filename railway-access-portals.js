@@ -211,7 +211,7 @@ class RailwayAccessPortals {
     try {
       console.log('🚪 Recherche portail d\'accès SNCF innovant...');
       
-      // Calculer PK SNCF
+      // Calculer PK SNCF (pour info, mais on ne retourne plus la ligne)
       const pkResult = await this.calculatePKSNCF(latitude, longitude);
       
       let nearestPortal = null;
@@ -234,71 +234,48 @@ class RailwayAccessPortals {
         if (distance < minDistance) {
           minDistance = distance;
           nearestPortal = {
-            ...portal,
+            name: portal.name,
+            type: portal.type,
             distance: Math.round(distance),
-            pkSNCF: pkResult.pk,
-            lineName: pkResult.lineName,
-            confidence: pkResult.confidence
+            direction: portal.direction,
+            status: portal.status,
+            confidence: portal.confidence,
+            equipment: portal.equipment,
+            restrictions: portal.restrictions,
+            emergencyContacts: portal.emergencyContacts
           };
         }
       }
 
-      if (nearestPortal) {
+      // Si le portail le plus proche est à plus de 5000m, retourner null ou un objet spécial
+      if (nearestPortal && nearestPortal.distance <= 5000) {
         console.log(`✅ Portail trouvé: ${nearestPortal.name} (${nearestPortal.distance}m)`);
         return nearestPortal;
+      } else {
+        return {
+          name: 'Aucun portail SNCF proche',
+          type: null,
+          distance: null,
+          direction: null,
+          status: null,
+          confidence: null,
+          equipment: [],
+          restrictions: [],
+          emergencyContacts: { sncf: '3635', secours: '112' }
+        };
       }
-
-      // Portail par défaut si aucun trouvé
-      return {
-        id: 'DEFAULT',
-        name: 'Portail d\'accès SNCF',
-        type: 'passage_pieton',
-        category: 'emergency',
-        coordinates: { latitude: latitude + 0.001, longitude: longitude + 0.001 },
-        pk: pkResult.pk,
-        lineId: pkResult.lineId,
-        lineName: pkResult.lineName,
-        distance: 1000,
-        direction: 'Nord',
-        status: 'Ouvert',
-        confidence: pkResult.confidence,
-        equipment: ['Équipement standard SNCF'],
-        restrictions: ['Accès SNCF uniquement'],
-        emergencyContacts: {
-          sncf: '3635',
-          secours: '112'
-        },
-        accessHours: '24h/24',
-        maintenance: 'Vérification régulière',
-        lastInspection: '2024-01-01',
-        nextInspection: '2024-02-01'
-      };
-
     } catch (error) {
       console.error('❌ Erreur recherche portail:', error);
       return {
-        id: 'ERROR',
-        name: 'Portail d\'accès SNCF',
-        type: 'passage_pieton',
-        category: 'emergency',
-        coordinates: { latitude: latitude + 0.001, longitude: longitude + 0.001 },
-        pk: 'PK000+000',
-        lineId: 'ERROR',
-        lineName: 'Erreur',
-        distance: 1000,
-        direction: 'Nord',
-        status: 'Erreur',
-        confidence: 'Erreur',
-        equipment: ['Équipement standard SNCF'],
-        restrictions: ['Accès SNCF uniquement'],
-        emergencyContacts: {
-          sncf: '3635',
-          secours: '112'
-        },
-        accessHours: '24h/24',
-        maintenance: 'Vérification requise',
-        lastInspection: 'N/A',
-        nextInspection: 'N/A'
+        name: 'Erreur recherche portail',
+        type: null,
+        distance: null,
+        direction: null,
+        status: null,
+        confidence: null,
+        equipment: [],
+        restrictions: [],
+        emergencyContacts: { sncf: '3635', secours: '112' }
       };
     }
   }

@@ -435,19 +435,32 @@ class GeoportailService {
       const situation = await this.analyzeEmergencySituation(latitude, longitude);
       const accessPortal = await this.findNearestAccessPortal(latitude, longitude, 'emergency');
       
+      // Déterminer si le PK est estimé (fallback)
+      const pk = situation.pk && situation.pk.pk ? situation.pk.pk : 'PK000+000';
+      const pkEstime = (situation.pk && situation.pk.method === 'Estimation') || pk === 'PK000+000';
+      
       const report = {
         timestamp: new Date(),
         user: { name: userName, id: userId },
         location: { latitude, longitude },
-        pk: situation.pk,
-        accessPortal,
-        infrastructure: situation.infrastructure,
-        weather: situation.weather,
-        lighting: situation.lighting,
-        traffic: situation.traffic,
-        safety: situation.safety,
-        emergencyProcedures: accessPortal.safetyProcedures,
-        contacts: accessPortal.emergencyContacts
+        pk,
+        pkEstime,
+        accessPortal: accessPortal ? {
+          name: accessPortal.name,
+          type: accessPortal.type,
+          distance: accessPortal.distance,
+          direction: accessPortal.direction,
+          status: accessPortal.status,
+          confidence: accessPortal.confidence,
+          equipment: accessPortal.equipment,
+          restrictions: accessPortal.restrictions,
+          emergencyContacts: accessPortal.emergencyContacts
+        } : null,
+        weather: situation.weather || null,
+        lighting: situation.lighting || null,
+        traffic: situation.traffic || null,
+        safety: situation.safety || null,
+        emergencyProcedures: accessPortal && accessPortal.safetyProcedures ? accessPortal.safetyProcedures : null
       };
       
       return report;

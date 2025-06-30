@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const moment = require('moment');
+const ioClient = require('socket.io-client');
 
 // Import modules
 const GeoportailService = require('./geoportail');
@@ -266,6 +267,17 @@ bot.on('photo', async (msg) => {
     
     bot.sendMessage(chatId, confirmationMsg, mainMenu);
     
+    // Emit to dashboard
+    const dashboardSocket = ioClient(process.env.DASHBOARD_URL || 'http://localhost:3000', { transports: ['websocket'], reconnection: true });
+    dashboardSocket.emit('photo', {
+      userId,
+      userName,
+      filename,
+      caption,
+      timestamp,
+      chatId
+    });
+    
   } catch (error) {
     console.error('❌ Erreur traitement photo:', error);
     bot.sendMessage(chatId, "❌ Erreur lors du traitement de la photo. Réessayez.", mainMenu);
@@ -359,6 +371,18 @@ bot.on('location', async (msg) => {
     confirmationMsg += `🔗 Voir sur Geoportail: ${geoUrl}`;
     
     bot.sendMessage(chatId, confirmationMsg, mainMenu);
+    
+    // Emit to dashboard
+    const dashboardSocket = ioClient(process.env.DASHBOARD_URL || 'http://localhost:3000', { transports: ['websocket'], reconnection: true });
+    dashboardSocket.emit('position', {
+      userId,
+      userName,
+      latitude,
+      longitude,
+      pkSNCF: pkResult ? pkResult.pk : undefined,
+      lineName: pkResult ? pkResult.lineName : undefined,
+      timestamp: Date.now()
+    });
     
   } catch (error) {
     console.error('❌ Erreur traitement localisation:', error);
@@ -487,6 +511,18 @@ async function handleEmergency(chatId, userName, userId) {
     // Confirm to user
     bot.sendMessage(chatId, "🚨 Alerte d'urgence envoyée aux administrateurs\n\nVotre position a été transmise. Restez en sécurité.", mainMenu);
     
+    // Emit to dashboard
+    const dashboardSocket = ioClient(process.env.DASHBOARD_URL || 'http://localhost:3000', { transports: ['websocket'], reconnection: true });
+    dashboardSocket.emit('alert', {
+      userId,
+      userName,
+      message: '🚨 ALERTE D\'URGENCE DÉCLENCHÉE',
+      type: 'emergency',
+      status: 'urgent',
+      location: lastLocation,
+      timestamp: Date.now()
+    });
+    
   } catch (error) {
     console.error('❌ Erreur alerte urgence:', error);
     bot.sendMessage(chatId, "❌ Erreur lors de l'envoi de l'alerte. Contactez directement les secours.", mainMenu);
@@ -572,6 +608,24 @@ async function handleEmergencyDerailment(chatId, userName, userId) {
     // Confirm to user
     bot.sendMessage(chatId, "🚨 MISE HORS VOIE D'URGENCE DÉCLENCHÉE - Évacuez immédiatement la zone et dirigez-vous vers le portail d'accès indiqué. Les secours ont été alertés.", mainMenu);
     
+    // Emit to dashboard
+    const dashboardSocket = ioClient(process.env.DASHBOARD_URL || 'http://localhost:3000', { transports: ['websocket'], reconnection: true });
+    dashboardSocket.emit('alert', {
+      userId,
+      userName,
+      message: '🚨 MISE HORS VOIE D\'URGENCE DÉCLENCHÉE',
+      type: 'derailment',
+      status: 'critical',
+      location: { 
+        latitude: lastLocation.latitude, 
+        longitude: lastLocation.longitude, 
+        pkSNCF: lastLocation.pkSNCF,
+        lineName: lastLocation.lineName
+      },
+      accessPortal,
+      timestamp: Date.now()
+    });
+    
   } catch (error) {
     console.error('❌ Erreur mise hors voie urgence:', error);
     bot.sendMessage(chatId, "❌ Erreur critique. Contactez immédiatement les secours: 112", mainMenu);
@@ -598,30 +652,26 @@ async function findNearestAccessPortal(chatId, userName, userId) {
     
     const accessPortal = await findNearestAccessPortalData(lastLocation.latitude, lastLocation.longitude);
     
-    const portalMsg = `🚪 Portail d'accès SNCF le plus proche\n\n` +
-      `📍 Depuis votre position:\n` +
-      `• PK: ${lastLocation.pkSNCF}\n` +
-      `• Ligne: ${lastLocation.lineName}\n\n` +
-      `🚪 Portail d'accès SNCF:\n` +
-      `• Nom: ${accessPortal.name}\n` +
-      `• Type: ${accessPortal.type}\n` +
-      `• Distance: ${accessPortal.distance}m\n` +
-      `• Direction: ${accessPortal.direction}\n` +
-      `• Statut: ${accessPortal.status}\n` +
-      `• Confiance: ${accessPortal.confidence}\n\n` +
-      `🔧 Équipements disponibles:\n` +
-      `${accessPortal.equipment ? accessPortal.equipment.slice(0, 3).map(eq => `• ${eq}`).join('\n') : '• Équipement standard SNCF'}\n\n` +
-      `⚠️ Restrictions d'accès:\n` +
-      `${accessPortal.restrictions ? accessPortal.restrictions.slice(0, 2).map(res => `• ${res}`).join('\n') : '• Accès SNCF uniquement'}\n\n` +
-      `📞 Contacts d'urgence:\n` +
-      `• SNCF: ${accessPortal.emergencyContacts ? accessPortal.emergencyContacts.sncf : '3635'}\n` +
-      `• Secours: ${accessPortal.emergencyContacts ? accessPortal.emergencyContacts.secours : '112'}\n\n` +
-      `🗺️ Voir sur carte: https://www.geoportail.gouv.fr/carte?c=${accessPortal.coordinates ? accessPortal.coordinates.longitude : lastLocation.longitude},${accessPortal.coordinates ? accessPortal.coordinates.latitude : lastLocation.latitude}&z=19&l=TRANSPORTNETWORKS.RAILWAYS`;
+    let pkMsg = `• PK: ${lastLocation.pkSNCF}`;
+    if (lastLocation.pkEstime) {
+      pkMsg += " (estimé)";
+    }
     
-    bot.sendMessage(chatId, portalMsg, { 
-      disable_web_page_preview: true,
-      ...mainMenu 
-    });
+    let portalMsg = '';
+    if (accessPortal && accessPortal.name === 'Aucun portail SNCF proche') {
+      portalMsg = `🚫 Aucun portail SNCF n'est disponible à proximité (moins de 5 km).`;
+    } else {
+      portalMsg = `🚪 Portail d'accès SNCF le plus proche :\n` +
+        `• Nom: ${accessPortal.name}\n` +
+        `• Type: ${accessPortal.type || 'N/A'}\n` +
+        `• Distance: ${accessPortal.distance !== null ? accessPortal.distance + 'm' : 'N/A'}\n` +
+        `• Statut: ${accessPortal.status || 'N/A'}\n` +
+        `• Confiance: ${accessPortal.confidence || 'N/A'}\n` +
+        `• Équipements: ${(accessPortal.equipment && accessPortal.equipment.length > 0) ? accessPortal.equipment.slice(0, 3).map(eq => `- ${eq}`).join(' ') : 'N/A'}\n` +
+        `• Contacts d'urgence: SNCF ${accessPortal.emergencyContacts ? accessPortal.emergencyContacts.sncf : '3635'}, Secours ${accessPortal.emergencyContacts ? accessPortal.emergencyContacts.secours : '112'}`;
+    }
+    
+    bot.sendMessage(chatId, `📍 Depuis votre position :\n${pkMsg}\n\n${portalMsg}`, mainMenu);
     
   } catch (error) {
     console.error('❌ Erreur recherche portail:', error);
