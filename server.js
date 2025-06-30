@@ -40,11 +40,20 @@ app.get('/api/photos', (req, res) => {
 
 app.get('/api/positions', (req, res) => {
   const data = loadData();
-  const positions = (data.locations || []).map(p => ({
+  // Utiliser à la fois locations et positions pour compatibilité
+  const locations = data.locations || [];
+  const positions = data.positions || [];
+  const allPositions = [...locations, ...positions].map(p => ({
     ...p,
-    pkEstime: p.pkEstime || false
+    pkEstime: p.pkEstime || false,
+    // Assurer que les propriétés essentielles sont présentes
+    userId: p.userId || 'unknown',
+    userName: p.userName || 'Utilisateur',
+    latitude: p.latitude || 0,
+    longitude: p.longitude || 0,
+    timestamp: p.timestamp || Date.now()
   }));
-  res.json(positions);
+  res.json(allPositions);
 });
 
 app.get('/api/messages', (req, res) => {
@@ -59,8 +68,9 @@ app.get('/api/users', (req, res) => {
   const data = loadData();
   const users = {};
   
-  // Extraire les utilisateurs uniques des positions
-  (data.locations || []).forEach(loc => {
+  // Extraire les utilisateurs uniques des positions (locations + positions)
+  const allPositions = [...(data.locations || []), ...(data.positions || [])];
+  allPositions.forEach(loc => {
     if (loc.userId && loc.userName) {
       users[loc.userId] = {
         userId: loc.userId,
@@ -87,6 +97,22 @@ app.get('/api/users', (req, res) => {
   });
   
   res.json(Object.values(users));
+});
+
+// Endpoint de debug pour voir les données brutes
+app.get('/api/debug', (req, res) => {
+  const data = loadData();
+  res.json({
+    locations: data.locations || [],
+    positions: data.positions || [],
+    messages: data.messages || [],
+    photos: data.photos || [],
+    alerts: data.alerts || [],
+    emergencies: data.emergencies || [],
+    totalLocations: (data.locations || []).length,
+    totalPositions: (data.positions || []).length,
+    totalMessages: (data.messages || []).length
+  });
 });
 
 // Instancier la classe RailwayAccessPortals une seule fois

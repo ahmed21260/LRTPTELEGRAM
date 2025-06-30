@@ -4,6 +4,19 @@
 let map, positionMarkers = {}, userList = [], selectedOperatorId = null;
 const socket = io();
 
+// Fonction de test pour vérifier les données
+window.testPositions = async function() {
+  try {
+    const response = await fetch('/api/debug');
+    const data = await response.json();
+    console.log('🔍 Debug données:', data);
+    alert(`Positions: ${data.totalPositions}, Locations: ${data.totalLocations}, Messages: ${data.totalMessages}`);
+  } catch (error) {
+    console.error('❌ Erreur test:', error);
+    alert('Erreur lors du test');
+  }
+};
+
 // --- Utilitaires ---
 function formatDate(ts) {
   if (!ts) return '';
@@ -29,15 +42,33 @@ window.showLightbox = showLightbox;
 
 // --- Chargement initial ---
 async function fetchAll() {
-  const [positions, alerts, photos, portals, emergencies, messages] = await Promise.all([
-    fetch('/api/positions').then(r => r.json()),
-    fetch('/api/alerts').then(r => r.json()),
-    fetch('/api/photos').then(r => r.json()),
-    fetch('/api/access-portals').then(r => r.json()),
-    fetch('/api/emergencies').then(r => r.json()).catch(()=>[]),
-    fetch('/api/messages').then(r => r.json()).catch(()=>[])
-  ]);
-  return { positions, alerts, photos, portals, emergencies, messages };
+  try {
+    const [positions, alerts, photos, portals, emergencies, messages] = await Promise.all([
+      fetch('/api/positions').then(r => r.json()),
+      fetch('/api/alerts').then(r => r.json()),
+      fetch('/api/photos').then(r => r.json()),
+      fetch('/api/access-portals').then(r => r.json()),
+      fetch('/api/emergencies').then(r => r.json()).catch(()=>[]),
+      fetch('/api/messages').then(r => r.json()).catch(()=>[])
+    ]);
+    
+    // Debug: afficher les données reçues
+    console.log('📊 Données reçues:', {
+      positions: positions.length,
+      alerts: alerts.length,
+      photos: photos.length,
+      messages: messages.length
+    });
+    
+    if (positions.length > 0) {
+      console.log('📍 Première position:', positions[0]);
+    }
+    
+    return { positions, alerts, photos, portals, emergencies, messages };
+  } catch (error) {
+    console.error('❌ Erreur chargement données:', error);
+    return { positions: [], alerts: [], photos: [], portals: [], emergencies: [], messages: [] };
+  }
 }
 
 // --- Grouper les positions par userId (plus récente) ---
@@ -85,18 +116,28 @@ function bounceMarker(marker) {
 
 // --- Afficher les marqueurs utilisateurs sur la carte ---
 function updateUserMarkers(positions, photos, messages) {
+  console.log('🗺️ Mise à jour marqueurs avec', positions.length, 'positions');
+  
   // Nettoyer anciens marqueurs
   Object.values(positionMarkers).forEach(m => map.removeLayer(m));
   positionMarkers = {};
 
   const latestPositions = getLatestPositionsByUser(positions);
-  userList = latestPositions.map(p => ({ userId: p.userId, userName: p.userName, latitude: p.latitude, longitude: p.longitude }));
+  console.log('📍 Positions uniques par utilisateur:', latestPositions.length);
+  
+  userList = latestPositions.map(p => ({ 
+    userId: p.userId, 
+    userName: p.userName, 
+    latitude: p.latitude, 
+    longitude: p.longitude 
+  }));
 
   const now = Date.now();
   // Pour la section opérateurs actifs
   let activeHtml = '';
 
   latestPositions.forEach(p => {
+    console.log('📍 Traitement position:', p.userName, 'à', p.latitude, p.longitude);
     // Chercher la dernière photo de l'utilisateur
     const userPhotos = (photos || []).filter(ph => ph.userId === p.userId);
     const lastPhotoObj = userPhotos.length > 0 ? userPhotos[userPhotos.length - 1] : null;
