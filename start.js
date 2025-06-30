@@ -10,8 +10,8 @@ const GeoportailService = require('./geoportail');
 // Configuration simple pour test
 const config = {
   telegram: {
-    token: '7583644274:AAHp6JF7VDa9ycKiSPSTs4apS512euatZMw',
-    adminChatId: 7648184043
+    token: process.env.TELEGRAM_TOKEN || '7583644274:AAHp6JF7VDa9ycKiSPSTs4apS512euatZMw',
+    adminChatId: process.env.ADMIN_CHAT_ID || 7648184043
   },
   app: {
     dataPath: './data.json',
