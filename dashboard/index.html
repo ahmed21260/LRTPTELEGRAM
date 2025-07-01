@@ -6,6 +6,16 @@
   <title>ENCO Dashboard</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f6fa; }
+    #map { width: 100%; height: 600px; margin: 2em auto; border-radius: 12px; box-shadow: 0 2px 8px #0002; }
+    .container { max-width: 900px; margin: auto; background: #fff; padding: 2em; border-radius: 12px; }
+    h1 { color: #1a237e; }
+    .ping-list { margin-top: 2em; }
+    .ping-item { margin-bottom: 0.5em; font-size: 1em; }
+    .ping-id { color: #3949ab; font-weight: bold; }
+    .ping-date { color: #888; font-size: 0.95em; }
+  </style>
 </head>
 <body class="bg-gradient-to-br from-blue-900 to-blue-400 min-h-screen flex">
   <!-- Sidebar -->
@@ -21,85 +31,40 @@
   </aside>
   <!-- Main content -->
   <main class="flex-1 p-10">
-    <div class="flex items-center justify-between mb-8">
-      <h2 class="text-3xl font-bold">Carte des Opérateurs <span id="status" class="ml-4 text-green-500 text-lg">● Système opérationnel</span></h2>
-      <button onclick="refreshAll()" class="bg-blue-600 text-white px-4 py-2 rounded shadow">🔄 Actualiser</button>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-      <div class="bg-gradient-to-br from-blue-600 to-purple-500 rounded-xl p-8 shadow text-white">
-        <h3 class="text-xl font-bold mb-2">👥 Opérateurs</h3>
-        <div id="total-ops" class="text-4xl font-extrabold">0</div>
-        <div class="text-sm">Total enregistrés</div>
-      </div>
-      <div class="bg-gradient-to-br from-blue-600 to-purple-500 rounded-xl p-8 shadow text-white">
-        <h3 class="text-xl font-bold mb-2">🟢 En ligne</h3>
-        <div id="online-ops" class="text-4xl font-extrabold">0</div>
-        <div class="text-sm">Actuellement en poste</div>
-      </div>
-    </div>
-    <div class="bg-white rounded-xl shadow p-4">
-      <h3 class="text-xl font-bold mb-4">🗺️ Carte des Opérateurs ENCO</h3>
-      <div id="map" class="w-full h-[500px] rounded"></div>
-    </div>
-    <div class="bg-white rounded-xl shadow p-4 mt-8">
-      <h3 class="text-xl font-bold mb-4">📷 Photos par opérateur</h3>
-      <div id="photos-by-operator" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+    <div class="container">
+      <h1>Carte des Opérateurs ENCO</h1>
+      <div id="map"></div>
+      <div class="ping-list" id="ping-list"></div>
     </div>
   </main>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    let map, markersLayer;
-    function initMap() {
-      map = L.map('map').setView([47, 2], 6);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap'
-      }).addTo(map);
-      markersLayer = L.layerGroup().addTo(map);
-    }
-    async function refreshAll() {
-      // Ping l'API pour signaler l'activité (simulateur)
-      await fetch('/api/ping', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: 'dashboard', userName: 'Dashboard' })
-      });
-      // Récupère les stats opérateurs
-      const res = await fetch('/api/operators');
-      const operators = await res.json();
-      document.getElementById('total-ops').textContent = operators.length;
-      const online = operators.filter(op => op.online);
-      document.getElementById('online-ops').textContent = online.length;
-      // Affiche les opérateurs sur la carte
-      markersLayer.clearLayers();
-      operators.forEach(op => {
-        if(op.lastPing && op.latitude && op.longitude) {
-          const marker = L.marker([op.latitude, op.longitude]).addTo(markersLayer);
-          marker.bindPopup(`<b>${op.userName || op.userId}</b><br>Dernier ping: ${new Date(op.lastPing).toLocaleString('fr-FR')}`);
-        }
-      });
-      // Récupère et affiche les photos triées par opérateur
-      const photosRes = await fetch('/api/photos');
-      const photos = await photosRes.json();
-      const byUser = {};
-      photos.forEach(photo => {
-        if (!byUser[photo.userId]) byUser[photo.userId] = [];
-        byUser[photo.userId].push(photo);
-      });
-      let html = '';
-      Object.keys(byUser).forEach(userId => {
-        html += `<div><h4 class='font-bold mb-2'>👤 ${byUser[userId][0].userName || userId}</h4><div class='flex flex-wrap gap-2 mb-4'>`;
-        byUser[userId].forEach(photo => {
-          html += `<img src="/photos/${photo.filename}" alt="photo" class="w-24 h-24 object-cover rounded shadow" title="${photo.filename}">`;
+    // Carte centrée sur la France
+    var map = L.map('map').setView([47, 2], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    // Récupère toutes les positions (pings)
+    fetch('/api/positions')
+      .then(res => res.json())
+      .then(positions => {
+        let html = '';
+        positions.forEach(pos => {
+          if(pos.latitude && pos.longitude) {
+            L.marker([pos.latitude, pos.longitude])
+              .addTo(map)
+              .bindPopup(
+                `<b>ID:</b> <span class='ping-id'>${pos.userId}</span><br>` +
+                `<b>Nom:</b> ${pos.userName || ''}<br>` +
+                `<b>Date:</b> <span class='ping-date'>${new Date(pos.timestamp).toLocaleString('fr-FR')}</span>`
+              );
+            html += `<div class='ping-item'>🛰️ <span class='ping-id'>${pos.userId}</span> - ${pos.userName || ''} <span class='ping-date'>${new Date(pos.timestamp).toLocaleString('fr-FR')}</span></div>`;
+          }
         });
-        html += '</div></div>';
+        document.getElementById('ping-list').innerHTML = html;
       });
-      document.getElementById('photos-by-operator').innerHTML = html;
-    }
-    window.onload = () => {
-      initMap();
-      refreshAll();
-    };
   </script>
 </body>
 </html> 
