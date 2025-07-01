@@ -41,6 +41,10 @@
       <h3 class="text-xl font-bold mb-4">🗺️ Carte des Opérateurs ENCO</h3>
       <div id="map" class="w-full h-[500px] rounded"></div>
     </div>
+    <div class="bg-white rounded-xl shadow p-4 mt-8">
+      <h3 class="text-xl font-bold mb-4">📷 Photos par opérateur</h3>
+      <div id="photos-by-operator" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+    </div>
   </main>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
@@ -74,6 +78,23 @@
           marker.bindPopup(`<b>${op.userName || op.userId}</b><br>Dernier ping: ${new Date(op.lastPing).toLocaleString('fr-FR')}`);
         }
       });
+      // Récupère et affiche les photos triées par opérateur
+      const photosRes = await fetch('/api/photos');
+      const photos = await photosRes.json();
+      const byUser = {};
+      photos.forEach(photo => {
+        if (!byUser[photo.userId]) byUser[photo.userId] = [];
+        byUser[photo.userId].push(photo);
+      });
+      let html = '';
+      Object.keys(byUser).forEach(userId => {
+        html += `<div><h4 class='font-bold mb-2'>👤 ${byUser[userId][0].userName || userId}</h4><div class='flex flex-wrap gap-2 mb-4'>`;
+        byUser[userId].forEach(photo => {
+          html += `<img src="/photos/${photo.filename}" alt="photo" class="w-24 h-24 object-cover rounded shadow" title="${photo.filename}">`;
+        });
+        html += '</div></div>';
+      });
+      document.getElementById('photos-by-operator').innerHTML = html;
     }
     window.onload = () => {
       initMap();

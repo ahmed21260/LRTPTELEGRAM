@@ -1,8 +1,11 @@
+const { initializeFirebase, FirestoreService } = require('./firebase');
+initializeFirebase(); // ← Doit être la toute première chose
+const firestoreService = new FirestoreService();
+
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
-const { initializeFirebase, FirestoreService } = require('./firebase');
 const compression = require('compression');
 const bodyParser = require('body-parser');
 
@@ -255,9 +258,6 @@ app.get('/', (req, res) => {
 server.listen(PORT, () => {
   console.log(`Serveur API/Socket.io/dashboard lancé sur le port ${PORT}`);
 });
-
-initializeFirebase(); // Initialisation Firebase OBLIGATOIRE
-const firestoreService = new FirestoreService();
 
 // Initialisation du bot Telegram dans le même process Railway
 try {
