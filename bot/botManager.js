@@ -16,10 +16,29 @@ class BotManager {
       console.log('🚦 Initialisation du bot LR ASSIST...');
       
       // Créer l'instance du bot
-      this.bot = new TelegramBot(this.config.telegram.token, {
-        polling: true,
-        parse_mode: 'Markdown'
-      });
+      if (this.config.telegram.webhookUrl) {
+        this.bot = new TelegramBot(this.config.telegram.token, {
+          webHook: {
+            port: process.env.BOT_PORT || 8443
+          },
+          parse_mode: 'Markdown'
+        });
+        // Enregistrement automatique du webhook
+        this.bot.setWebHook(this.config.telegram.webhookUrl + '/bot' + this.config.telegram.token)
+          .then(() => {
+            console.log('🌐 Webhook Telegram enregistré automatiquement :', this.config.telegram.webhookUrl);
+          })
+          .catch(err => {
+            console.error('❌ Erreur enregistrement webhook Telegram :', err.message);
+          });
+        console.log('🌐 Bot Telegram démarré en mode webhook:', this.config.telegram.webhookUrl);
+      } else {
+        this.bot = new TelegramBot(this.config.telegram.token, {
+          polling: true,
+          parse_mode: 'Markdown'
+        });
+        console.log('🤖 Bot Telegram démarré en mode polling');
+      }
 
       // Gérer les erreurs de polling
       this.bot.on('polling_error', (error) => {

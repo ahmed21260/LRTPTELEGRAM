@@ -3,6 +3,8 @@
 // --- Initialisation ---
 let map, positionMarkers = {}, userList = [], selectedOperatorId = null;
 const socket = io();
+let markerClusterGroup;
+let currentOperatorsTab = 'actifs';
 
 // Fonction de test pour vérifier les données
 window.testPositions = async function() {
@@ -119,7 +121,7 @@ function updateUserMarkers(positions, photos, messages) {
   console.log('🗺️ Mise à jour marqueurs avec', positions.length, 'positions');
   
   // Nettoyer anciens marqueurs
-  Object.values(positionMarkers).forEach(m => map.removeLayer(m));
+  markerClusterGroup.clearLayers();
   positionMarkers = {};
 
   const latestPositions = getLatestPositionsByUser(positions);
@@ -163,9 +165,9 @@ function updateUserMarkers(positions, photos, messages) {
     try {
       marker = L.marker([p.latitude, p.longitude], {
         icon: userMarkerIcon(p.userId, p.userName)
-      }).addTo(map);
+      });
     } catch {
-      marker = L.marker([p.latitude, p.longitude]).addTo(map);
+      marker = L.marker([p.latitude, p.longitude]);
     }
     let popupContent = `<b>${escapeHTML(p.userName || p.userId)}</b>`;
     if (isNew) popupContent += ' <span class="bg-green-500 text-white text-xs px-2 py-0.5 rounded align-middle">Nouveau</span>';
@@ -178,6 +180,7 @@ function updateUserMarkers(positions, photos, messages) {
     if (timerText) popupContent += `<div class='mt-1 text-xs text-blue-700 font-bold'>${timerText}</div>`;
     marker.bindPopup(popupContent);
     positionMarkers[p.userId] = marker;
+    markerClusterGroup.addLayer(marker);
     // Animation si nouvelle position
     if (isNew) bounceMarker(marker);
     // Ajout à la section opérateurs actifs
@@ -224,6 +227,8 @@ function initMap() {
     maxZoom: 19,
     attribution: '© OpenStreetMap'
   }).addTo(map);
+  markerClusterGroup = L.markerClusterGroup();
+  map.addLayer(markerClusterGroup);
 }
 
 // --- Affichage alertes ---
@@ -311,10 +316,28 @@ function renderPhotos(photos) {
   const list = document.getElementById('photos-list');
   list.innerHTML = photos.map(p => `
     <div class="relative group cursor-pointer bg-white rounded shadow hover:ring-2 hover:ring-blue-400 transition overflow-hidden">
-      <img src="/data/photos/${escapeHTML(p.filename)}" alt="Photo chantier" class="rounded-t w-full object-cover h-40" onclick="showLightbox('/data/photos/${escapeHTML(p.filename)}')">
+      <img data-src="/data/photos/${escapeHTML(p.filename)}" alt="Photo chantier" class="rounded-t w-full object-cover h-40 lazy-photo" onclick="showLightbox('/data/photos/${escapeHTML(p.filename)}')">
       <div class="p-2 text-xs text-gray-700">${escapeHTML(p.caption || '')}</div>
       <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs p-1 opacity-0 group-hover:opacity-100 transition">Cliquez pour agrandir</div>
     </div>`).join('');
+  // Lazy loading avec IntersectionObserver
+  const lazyImages = document.querySelectorAll('.lazy-photo');
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          img.src = img.dataset.src;
+          img.classList.remove('lazy-photo');
+          obs.unobserve(img);
+        }
+      });
+    });
+    lazyImages.forEach(img => observer.observe(img));
+  } else {
+    // Fallback si IntersectionObserver non supporté
+    lazyImages.forEach(img => { img.src = img.dataset.src; });
+  }
 }
 
 // --- Affichage portails ---
@@ -362,6 +385,23 @@ function exportData(data) {
   URL.revokeObjectURL(url);
 }
 
+function exportCSVData(data) {
+  // On exporte les positions (ou tout autre jeu de données pertinent)
+  const positions = data.positions || [];
+  if (!positions.length) return alert('Aucune donnée à exporter.');
+  const header = Object.keys(positions[0]);
+  const csv = [header.join(',')].concat(
+    positions.map(row => header.map(h => '"' + String(row[h]||'').replace(/"/g, '""') + '"').join(','))
+  ).join('\n');
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'lr-rail-assist-export.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // --- Initialisation globale ---
 let globalData = {};
 window.onload = async () => {
@@ -377,11 +417,24 @@ window.onload = async () => {
   renderMessages(data.messages);
   renderLogs(data.messages);
   renderKnownUsers(data.messages, data.positions);
-  renderOperatorsList(data.positions);
+  renderOperatorsList(data.positions, data.messages);
   renderOperatorDetails(selectedOperatorId, data.positions, data.photos, data.messages);
   // Export
   if (document.getElementById('export-btn'))
     document.getElementById('export-btn').onclick = () => exportData(globalData);
+  if (document.getElementById('export-csv-btn'))
+    document.getElementById('export-csv-btn').onclick = () => exportCSVData(globalData);
+  // Gestion des onglets
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('bg-blue-600', 'text-white', 'bg-gray-200', 'text-blue-800', 'bg-red-100', 'text-red-700'));
+      if (btn.dataset.tab === 'actifs') btn.classList.add('bg-blue-600', 'text-white');
+      else if (btn.dataset.tab === 'tous') btn.classList.add('bg-gray-200', 'text-blue-800');
+      else if (btn.dataset.tab === 'urgences') btn.classList.add('bg-red-100', 'text-red-700');
+      currentOperatorsTab = btn.dataset.tab;
+      renderOperatorsList(globalData.positions, globalData.messages);
+    };
+  });
 };
 
 // --- WebSocket temps réel ---
@@ -402,22 +455,40 @@ socket.on('position', data => {
 
 // --- Les boutons de catégories (Alertes, Urgences, etc.) servent uniquement à masquer/afficher les sections, pas à filtrer ou rediriger. ---
 
-function renderOperatorsList(positions) {
+function renderOperatorsList(positions, messages) {
   const operatorsDiv = document.getElementById('operators-list');
   if (!operatorsDiv) return;
-  // Récupère tous les opérateurs actifs (ayant une position)
-  const latestPositions = getLatestPositionsByUser(positions);
+  let latestPositions = getLatestPositionsByUser(positions);
+  if (currentOperatorsTab === 'urgences') {
+    // Filtrer les opérateurs ayant envoyé une urgence
+    const urgentUserIds = new Set((messages||[]).filter(m => m.type === 'urgence' || m.status === 'urgent' || m.status === 'critical').map(m => m.userId));
+    latestPositions = latestPositions.filter(p => urgentUserIds.has(p.userId));
+  } else if (currentOperatorsTab === 'actifs') {
+    // Déjà filtré par défaut (ceux ayant une position)
+  } else if (currentOperatorsTab === 'tous') {
+    // Afficher tous les utilisateurs connus
+    const ids = new Set(messages.map(m => m.userId));
+    positions.forEach(p => ids.add(p.userId));
+    latestPositions = Array.from(ids).map(id => {
+      const pos = positions.find(p => p.userId === id) || {};
+      pos.userId = id;
+      pos.userName = pos.userName || (messages.find(m => m.userId === id)?.userName) || id;
+      return pos;
+    });
+  }
   operatorsDiv.innerHTML = latestPositions.map(p => {
     const color = userColor(p.userId);
     const initial = (p.userName || p.userId)[0]?.toUpperCase() || '?';
     const isSelected = selectedOperatorId === p.userId;
+    // Détection urgence
+    const isUrgent = (messages||[]).some(m => m.userId === p.userId && (m.type === 'urgence' || m.status === 'urgent' || m.status === 'critical'));
     return `
-      <span class="flex items-center gap-2 px-5 py-2 rounded-full font-bold shadow-lg ring-2 hover:scale-105 active:scale-95 focus:outline-none transition-all duration-150 select-none border-2 cursor-pointer ${isSelected ? 'bg-blue-600 text-white ring-blue-400 border-blue-700 scale-105' : ''}"
+      <span class="flex items-center gap-2 px-5 py-2 rounded-full font-bold shadow-lg ring-2 hover:scale-105 active:scale-95 focus:outline-none transition-all duration-150 select-none border-2 cursor-pointer ${isSelected ? 'bg-blue-600 text-white ring-blue-400 border-blue-700 scale-105' : ''} ${isUrgent ? 'bg-red-100 text-red-700 border-red-400' : ''}"
         style="background-color:${isSelected ? color : color + '22'}; color:${isSelected ? '#fff' : color}; border-color:${color};"
         onclick="selectOperator('${p.userId}')">
         <span class="inline-block w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg shadow" style="background-color:${color}; color:#fff;">${initial}</span>
         ${escapeHTML(p.userName || p.userId)}
-        <span class="ml-2 px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold shadow">Actif</span>
+        <span class="ml-2 px-2 py-0.5 rounded-full ${isUrgent ? 'bg-red-500' : 'bg-green-500'} text-white text-xs font-semibold shadow">${isUrgent ? 'Urgence' : 'Actif'}</span>
       </span>
     `;
   }).join('');
@@ -426,7 +497,7 @@ function renderOperatorsList(positions) {
 window.selectOperator = function(userId) {
   selectedOperatorId = userId;
   // Rafraîchir la liste pour mettre à jour le style sélectionné
-  renderOperatorsList(globalData.positions);
+  renderOperatorsList(globalData.positions, globalData.messages);
   renderOperatorDetails(userId, globalData.positions, globalData.photos, globalData.messages);
 };
 

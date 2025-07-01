@@ -7,6 +7,8 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Lightbox pour les photos -->
@@ -58,12 +60,22 @@
           <div class="bg-white rounded shadow p-4">
             <h3 class="font-semibold mb-2 flex items-center gap-2">🚪 Derniers portails</h3>
             <div id="portals-summary" class="flex flex-col gap-2"></div>
-          </div>
+        </div>
         </section>
-      </div>
+        <!-- Ajout bouton export CSV -->
+        <div class="flex gap-2 mb-4">
+          <button id="export-btn" class="bg-blue-600 text-white px-4 py-2 rounded font-bold shadow">Export JSON</button>
+          <button id="export-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded font-bold shadow">Export CSV</button>
+        </div>
+    </div>
       <!-- Colonne opérateurs -->
       <aside class="w-80 bg-gradient-to-b from-blue-50 to-white border-l flex flex-col rounded shadow-xl p-8 gap-8 font-sans">
         <h3 class="text-2xl font-extrabold mb-6 flex items-center gap-2 text-blue-800 tracking-tight">👥 Opérateurs actifs</h3>
+        <div id="operators-tabs" class="flex gap-2 mb-4">
+          <button class="tab-btn bg-blue-600 text-white px-3 py-1 rounded font-bold" data-tab="actifs">Actifs</button>
+          <button class="tab-btn bg-gray-200 text-blue-800 px-3 py-1 rounded font-bold" data-tab="tous">Tous</button>
+          <button class="tab-btn bg-red-100 text-red-700 px-3 py-1 rounded font-bold" data-tab="urgences">Urgences</button>
+        </div>
         <div id="operators-list" class="flex flex-wrap gap-4 mb-8">
           <!-- Exemple de badges opérateurs stylés et interactifs (CSS only) -->
           <span class="flex items-center gap-2 px-5 py-2 rounded-full bg-blue-100 text-blue-800 font-bold shadow-lg ring-2 ring-blue-300 hover:bg-blue-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-400 cursor-pointer transition-all duration-150 select-none border-2 border-blue-200">
@@ -87,15 +99,16 @@
             Cindy (sélectionné)
             <span class="ml-2 px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold shadow">Actif</span>
           </span>
-        </div>
+    </div>
         <div id="operator-details" class="mt-4 bg-white rounded-2xl shadow-lg p-8 min-h-[120px] border border-blue-100">
           <span class="text-gray-400 text-lg">Sélectionne un opérateur pour voir ses infos détaillées.</span>
-        </div>
+    </div>
       </aside>
     </main>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/socket.io/socket.io.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
   <script src="dashboard.js"></script>
 </body>
-</html>
+</html> 
