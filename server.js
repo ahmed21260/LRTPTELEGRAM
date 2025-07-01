@@ -225,6 +225,67 @@ app.post('/api/receive', checkApiKey, async (req, res) => {
   }
 });
 
+// Endpoint pour enregistrer un ping opérateur
+app.post('/api/ping', async (req, res) => {
+  const { userId, userName } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId requis' });
+  try {
+    await firestoreService.savePing({ userId, userName, timestamp: Date.now() });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur Firestore', details: error.message });
+  }
+});
+
+// Endpoint pour récupérer la liste des opérateurs et leur statut
+app.get('/api/operators', async (req, res) => {
+  try {
+    const operators = await firestoreService.getOperatorsWithStatus();
+    res.json(operators);
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur Firestore', details: error.message });
+  }
+});
+
+// Route racine pour healthcheck Railway
+app.get('/', (req, res) => {
+  res.send('LRTP Telegram API & Dashboard OK');
+});
+
 server.listen(PORT, () => {
   console.log(`Serveur API/Socket.io/dashboard lancé sur le port ${PORT}`);
-}); 
+});
+
+// Initialisation du bot Telegram dans le même process Railway
+try {
+  const config = require('./config');
+  const TelegramBot = require('node-telegram-bot-api');
+  const bot = new TelegramBot(config.telegram.token, { polling: true });
+  global.bot = bot; // Pour le webhook si besoin
+
+  // Exemple de handler message
+  bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id.toString();
+    const userName = msg.from.first_name || 'Utilisateur';
+    const text = msg.text || '';
+
+    // Log dans la console
+    console.log(`📩 [Telegram] ${userName} (${userId}) : ${text}`);
+
+    // Sauvegarde dans Firestore
+    await firestoreService.saveMessage({
+      userId,
+      userName,
+      message: text,
+      type: 'message',
+      status: 'normal',
+      chatId,
+      timestamp: Date.now()
+    });
+  });
+
+  console.log('🤖 Bot Telegram initialisé dans server.js');
+} catch (error) {
+  console.error('❌ Erreur initialisation bot Telegram:', error);
+} 
