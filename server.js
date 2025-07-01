@@ -256,6 +256,8 @@ server.listen(PORT, () => {
   console.log(`Serveur API/Socket.io/dashboard lancé sur le port ${PORT}`);
 });
 
+const firestoreService = new FirestoreService();
+
 // Initialisation du bot Telegram dans le même process Railway
 try {
   const config = require('./config');
@@ -263,12 +265,17 @@ try {
   const bot = new TelegramBot(config.telegram.token, { polling: true });
   global.bot = bot; // Pour le webhook si besoin
 
-  // Exemple de handler message
+  // Handler message Telegram
   bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
     const userName = msg.from.first_name || 'Utilisateur';
     const text = msg.text || '';
+    let latitude = null, longitude = null;
+    if (msg.location) {
+      latitude = msg.location.latitude;
+      longitude = msg.location.longitude;
+    }
 
     // Log dans la console
     console.log(`📩 [Telegram] ${userName} (${userId}) : ${text}`);
@@ -281,7 +288,17 @@ try {
       type: 'message',
       status: 'normal',
       chatId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      latitude,
+      longitude
+    });
+    // Sauvegarde le ping avec position si dispo
+    await firestoreService.savePing({
+      userId,
+      userName,
+      timestamp: Date.now(),
+      latitude,
+      longitude
     });
   });
 

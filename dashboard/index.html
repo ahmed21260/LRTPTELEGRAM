@@ -2,113 +2,83 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard Telegram | LR RAIL ASSIST</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ENCO Dashboard</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="dashboard.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
 </head>
-<body class="bg-gray-50 min-h-screen">
-  <!-- Lightbox pour les photos -->
-  <div id="lightbox" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
-    <button id="lightbox-close" class="absolute top-4 right-4 text-white text-3xl">&times;</button>
-    <img id="lightbox-img" src="" alt="Photo" class="max-h-[90vh] max-w-[90vw] rounded shadow-lg border-4 border-white">
-  </div>
-  <div class="flex min-h-screen">
-    <!-- Menu vertical -->
-    <aside class="w-64 bg-white border-r flex flex-col items-center py-8 gap-8 shadow-lg">
-      <img src="https://img.icons8.com/ios-filled/50/4a90e2/train.png" alt="Logo" class="h-12 w-12 mb-2">
-      <h1 class="text-2xl font-bold text-blue-700 mb-6">LR RAIL ASSIST</h1>
-      <nav class="flex flex-col gap-4 w-full px-4">
-        <a href="index.html" class="flex items-center gap-2 px-4 py-2 rounded hover:bg-blue-50 font-semibold text-blue-700 bg-blue-100">🏠 Accueil</a>
-        <a href="photos.html" class="flex items-center gap-2 px-4 py-2 rounded hover:bg-blue-50">📷 Photos</a>
-        <a href="messages.html" class="flex items-center gap-2 px-4 py-2 rounded hover:bg-blue-50">✉️ Messages</a>
-        <a href="urgences.html" class="flex items-center gap-2 px-4 py-2 rounded hover:bg-blue-50">⚠️ Urgences</a>
-        <a href="alertes.html" class="flex items-center gap-2 px-4 py-2 rounded hover:bg-blue-50">🚨 Alertes</a>
-        <a href="portails.html" class="flex items-center gap-2 px-4 py-2 rounded hover:bg-blue-50">🚪 Portails</a>
-      </nav>
-      <div class="mt-auto text-xs text-gray-400">&copy; 2024 LR RAIL ASSIST</div>
-    </aside>
-    <!-- Contenu principal avec colonne opérateurs -->
-    <main class="flex-1 flex flex-row gap-6 p-6">
-      <!-- Colonne principale (carte + résumés) -->
-      <div class="flex-1 flex flex-col gap-6">
-        <section class="bg-white rounded shadow p-4 flex flex-col">
-          <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><span>🗺️</span> Opérateurs en cours d'intervention</h2>
-          <div id="map" class="w-full h-[750px] rounded shadow mb-4"></div>
-        </section>
-        <!-- Résumés sous la carte -->
-        <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-2 flex items-center gap-2">✉️ Derniers messages</h3>
-            <div id="messages-summary" class="flex flex-col gap-2"></div>
-          </div>
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-2 flex items-center gap-2">📷 Dernières photos</h3>
-            <div id="photos-summary" class="grid grid-cols-2 md:grid-cols-3 gap-2"></div>
-          </div>
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-2 flex items-center gap-2">🚨 Dernières alertes</h3>
-            <div id="alerts-summary" class="flex flex-col gap-2"></div>
-          </div>
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-2 flex items-center gap-2">⚠️ Dernières urgences</h3>
-            <div id="emergencies-summary" class="flex flex-col gap-2"></div>
-          </div>
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-2 flex items-center gap-2">🚪 Derniers portails</h3>
-            <div id="portals-summary" class="flex flex-col gap-2"></div>
-        </div>
-        </section>
-        <!-- Ajout bouton export CSV -->
-        <div class="flex gap-2 mb-4">
-          <button id="export-btn" class="bg-blue-600 text-white px-4 py-2 rounded font-bold shadow">Export JSON</button>
-          <button id="export-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded font-bold shadow">Export CSV</button>
-        </div>
+<body class="bg-gradient-to-br from-blue-900 to-blue-400 min-h-screen flex">
+  <!-- Sidebar -->
+  <aside class="w-64 bg-blue-800 text-white flex flex-col items-center py-8">
+    <img src="https://img.icons8.com/ios-filled/100/ffffff/inspection.png" alt="ENCO" class="w-24 h-24 rounded-full mb-4 border-4 border-white shadow-lg">
+    <h1 class="text-2xl font-bold mb-8">ENCO</h1>
+    <nav class="flex flex-col gap-4 w-full px-6">
+      <a href="#" class="py-2 px-4 rounded bg-blue-700 font-semibold">Carte</a>
+      <a href="#" class="py-2 px-4 rounded hover:bg-blue-700">Historique</a>
+      <a href="#" class="py-2 px-4 rounded hover:bg-blue-700">Documents</a>
+      <a href="#" class="py-2 px-4 rounded hover:bg-blue-700">Statistiques</a>
+    </nav>
+  </aside>
+  <!-- Main content -->
+  <main class="flex-1 p-10">
+    <div class="flex items-center justify-between mb-8">
+      <h2 class="text-3xl font-bold">Carte des Opérateurs <span id="status" class="ml-4 text-green-500 text-lg">● Système opérationnel</span></h2>
+      <button onclick="refreshAll()" class="bg-blue-600 text-white px-4 py-2 rounded shadow">🔄 Actualiser</button>
     </div>
-      <!-- Colonne opérateurs -->
-      <aside class="w-80 bg-gradient-to-b from-blue-50 to-white border-l flex flex-col rounded shadow-xl p-8 gap-8 font-sans">
-        <h3 class="text-2xl font-extrabold mb-6 flex items-center gap-2 text-blue-800 tracking-tight">👥 Opérateurs actifs</h3>
-        <div id="operators-tabs" class="flex gap-2 mb-4">
-          <button class="tab-btn bg-blue-600 text-white px-3 py-1 rounded font-bold" data-tab="actifs">Actifs</button>
-          <button class="tab-btn bg-gray-200 text-blue-800 px-3 py-1 rounded font-bold" data-tab="tous">Tous</button>
-          <button class="tab-btn bg-red-100 text-red-700 px-3 py-1 rounded font-bold" data-tab="urgences">Urgences</button>
-        </div>
-        <div id="operators-list" class="flex flex-wrap gap-4 mb-8">
-          <!-- Exemple de badges opérateurs stylés et interactifs (CSS only) -->
-          <span class="flex items-center gap-2 px-5 py-2 rounded-full bg-blue-100 text-blue-800 font-bold shadow-lg ring-2 ring-blue-300 hover:bg-blue-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-400 cursor-pointer transition-all duration-150 select-none border-2 border-blue-200">
-            <span class="inline-block w-9 h-9 rounded-full bg-blue-400 text-white flex items-center justify-center font-bold text-lg shadow">C</span>
-            Cindy
-            <span class="ml-2 px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold shadow">Actif</span>
-          </span>
-          <span class="flex items-center gap-2 px-5 py-2 rounded-full bg-green-100 text-green-800 font-bold shadow-lg ring-2 ring-green-300 hover:bg-green-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-green-400 cursor-pointer transition-all duration-150 select-none border-2 border-green-200">
-            <span class="inline-block w-9 h-9 rounded-full bg-green-400 text-white flex items-center justify-center font-bold text-lg shadow">L</span>
-            LRTP
-            <span class="ml-2 px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold shadow">Actif</span>
-          </span>
-          <span class="flex items-center gap-2 px-5 py-2 rounded-full bg-purple-100 text-purple-800 font-bold shadow-lg ring-2 ring-purple-300 hover:bg-purple-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-purple-400 cursor-pointer transition-all duration-150 select-none border-2 border-purple-200">
-            <span class="inline-block w-9 h-9 rounded-full bg-purple-400 text-white flex items-center justify-center font-bold text-lg shadow">S</span>
-            Steve
-            <span class="ml-2 px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold shadow">Actif</span>
-          </span>
-          <!-- Exemple de badge sélectionné -->
-          <span class="flex items-center gap-2 px-5 py-2 rounded-full bg-blue-600 text-white font-bold shadow-xl ring-4 ring-blue-400 scale-105 border-2 border-blue-700">
-            <span class="inline-block w-9 h-9 rounded-full bg-blue-800 text-white flex items-center justify-center font-bold text-lg shadow">C</span>
-            Cindy (sélectionné)
-            <span class="ml-2 px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold shadow">Actif</span>
-          </span>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+      <div class="bg-gradient-to-br from-blue-600 to-purple-500 rounded-xl p-8 shadow text-white">
+        <h3 class="text-xl font-bold mb-2">👥 Opérateurs</h3>
+        <div id="total-ops" class="text-4xl font-extrabold">0</div>
+        <div class="text-sm">Total enregistrés</div>
+      </div>
+      <div class="bg-gradient-to-br from-blue-600 to-purple-500 rounded-xl p-8 shadow text-white">
+        <h3 class="text-xl font-bold mb-2">🟢 En ligne</h3>
+        <div id="online-ops" class="text-4xl font-extrabold">0</div>
+        <div class="text-sm">Actuellement en poste</div>
+      </div>
     </div>
-        <div id="operator-details" class="mt-4 bg-white rounded-2xl shadow-lg p-8 min-h-[120px] border border-blue-100">
-          <span class="text-gray-400 text-lg">Sélectionne un opérateur pour voir ses infos détaillées.</span>
+    <div class="bg-white rounded-xl shadow p-4">
+      <h3 class="text-xl font-bold mb-4">🗺️ Carte des Opérateurs ENCO</h3>
+      <div id="map" class="w-full h-[500px] rounded"></div>
     </div>
-      </aside>
-    </main>
-  </div>
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
-  <script src="dashboard.js"></script>
+  </main>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    let map, markersLayer;
+    function initMap() {
+      map = L.map('map').setView([47, 2], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
+      markersLayer = L.layerGroup().addTo(map);
+    }
+    async function refreshAll() {
+      // Ping l'API pour signaler l'activité (simulateur)
+      await fetch('/api/ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: 'dashboard', userName: 'Dashboard' })
+      });
+      // Récupère les stats opérateurs
+      const res = await fetch('/api/operators');
+      const operators = await res.json();
+      document.getElementById('total-ops').textContent = operators.length;
+      const online = operators.filter(op => op.online);
+      document.getElementById('online-ops').textContent = online.length;
+      // Affiche les opérateurs sur la carte
+      markersLayer.clearLayers();
+      operators.forEach(op => {
+        if(op.lastPing && op.latitude && op.longitude) {
+          const marker = L.marker([op.latitude, op.longitude]).addTo(markersLayer);
+          marker.bindPopup(`<b>${op.userName || op.userId}</b><br>Dernier ping: ${new Date(op.lastPing).toLocaleString('fr-FR')}`);
+        }
+      });
+    }
+    window.onload = () => {
+      initMap();
+      refreshAll();
+    };
+  </script>
 </body>
 </html> 

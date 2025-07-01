@@ -4,6 +4,7 @@ const path = require('path');
 const https = require('https');
 const moment = require('moment');
 const ioClient = require('socket.io-client');
+const { FirestoreService, StorageService } = require('./firebase');
 
 // Import modules
 const GeoportailService = require('./geoportail');
@@ -56,49 +57,12 @@ if (!fs.existsSync(PHOTO_DIR)) {
   fs.mkdirSync(PHOTO_DIR, { recursive: true });
 }
 
-// Load data
-function loadData() {
-  try {
-    const data = JSON.parse(fs.readFileSync(config.app.dataPath, 'utf8'));
-    // Ensure all required arrays exist
-    if (!data.messages) data.messages = [];
-    if (!data.photos) data.photos = [];
-    if (!data.locations) data.locations = [];
-    if (!data.emergencies) data.emergencies = [];
-    if (!data.checklist) data.checklist = {};
-    return data;
-  } catch {
-    return { 
-      messages: [], 
-      photos: [], 
-      locations: [], 
-      emergencies: [],
-      checklist: {} 
-    };
-  }
-}
-
-// Save data
-function saveData(data) {
-  fs.writeFileSync(config.app.dataPath, JSON.stringify(data, null, 2));
-}
-
-// Menu principal
-const mainMenu = {
-  reply_markup: {
-    keyboard: [
-      ['📸 Envoyer une photo', '📍 Partager ma position'],
-      ['✅ Checklist sécurité', '⚠️ Déclencher une urgence'],
-      ['🚨 Mise hors voie urgente', '🚪 Portail d\'accès SNCF'],
-      ['📘 Fiches techniques', 'ℹ️ Aide'],
-      ['📊 Historique', '🔧 Paramètres']
-    ],
-    resize_keyboard: true
-  }
-};
+// Initialize Firestore and Storage services
+const firestoreService = new FirestoreService();
+const storageService = new StorageService();
 
 // /start command
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userName = msg.from.first_name || 'utilisateur';
   const userId = msg.from.id.toString();
@@ -108,9 +72,8 @@ bot.onText(/\/start/, (msg) => {
     `📱 Votre ID: ${userId}\n\n` +
     `Utilise le menu ci-dessous pour accéder aux fonctions.`;
 
-  // Save user info locally
-  let data = loadData();
-  data.messages.push({
+  // Save user info in Firestore
+  await firestoreService.saveMessage({
     userId,
     userName,
     message: 'Utilisateur connecté',
@@ -119,7 +82,6 @@ bot.onText(/\/start/, (msg) => {
     chatId,
     timestamp: Date.now()
   });
-  saveData(data);
 
   bot.sendMessage(chatId, welcome, mainMenu);
 });
@@ -189,9 +151,8 @@ bot.on('message', async (msg) => {
         break;
 
       default:
-        // Save regular message locally
-        let data = loadData();
-        data.messages.push({
+        // Save regular message in Firestore
+        await firestoreService.saveMessage({
           userId,
           userName,
           message: text,
@@ -200,8 +161,6 @@ bot.on('message', async (msg) => {
           chatId,
           timestamp: Date.now()
         });
-        saveData(data);
-
         bot.sendMessage(chatId, "✅ Message enregistré. Utilise le menu pour les actions spécifiques 👇", mainMenu);
     }
   } catch (error) {
@@ -229,43 +188,27 @@ bot.on('photo', async (msg) => {
     const url = `https://api.telegram.org/file/bot${config.telegram.token}/${filePath}`;
     const timestamp = Date.now();
     const filename = `photo_${timestamp}.jpg`;
-    const dest = path.join(PHOTO_DIR, filename);
+    const localDest = path.join(PHOTO_DIR, filename);
     
     // Download file
-    await downloadFile(url, dest);
+    await downloadFile(url, localDest);
     
-    // Save to local data
-    let data = loadData();
-    data.photos.push({
+    // Upload to Firebase Storage
+    const storageResult = await storageService.uploadPhoto(localDest, filename);
+    
+    // Save metadata in Firestore
+    await firestoreService.savePhoto({
       userId,
       userName,
       filename,
       caption,
       timestamp,
       chatId,
-      fileSize: fs.statSync(dest).size
+      url: storageResult.url,
+      fileSize: storageResult.size
     });
     
-    data.messages.push({
-      userId,
-      userName,
-      message: `📸 ${caption}`,
-      type: 'photo',
-      status: 'normal',
-      photoUrl: `local://${filename}`,
-      chatId,
-      timestamp
-    });
-    
-    saveData(data);
-    
-    // Send confirmation
-    const confirmationMsg = `📸 Photo traitée avec succès\n\n` +
-      `📝 Description: ${caption}\n` +
-      `📏 Taille: ${(fs.statSync(dest).size / 1024).toFixed(2)} KB\n` +
-      `💾 Sauvegardée localement`;
-    
-    bot.sendMessage(chatId, confirmationMsg, mainMenu);
+    bot.sendMessage(chatId, '✅ Photo sauvegardée et synchronisée sur le cloud !');
     
     // Emit to dashboard
     const dashboardSocket = ioClient(process.env.DASHBOARD_URL || 'http://localhost:3000', { transports: ['websocket'], reconnection: true });
@@ -280,7 +223,7 @@ bot.on('photo', async (msg) => {
     
   } catch (error) {
     console.error('❌ Erreur traitement photo:', error);
-    bot.sendMessage(chatId, "❌ Erreur lors du traitement de la photo. Réessayez.", mainMenu);
+    bot.sendMessage(chatId, "❌ Erreur lors de la sauvegarde de la photo.");
   }
 });
 
@@ -290,22 +233,17 @@ bot.on('location', async (msg) => {
   const userId = msg.from.id.toString();
   const userName = msg.from.first_name || 'Utilisateur';
   const { latitude, longitude } = msg.location;
-  
+
   try {
-    console.log('📍 Traitement localisation reçue avec géométrie précise...');
-    
-    // Calculate PK SNCF with precise geometry
+    console.log('📍 Traitement localisation reçue...');
+    // Calcul PK SNCF
     const pkResult = await geoportal.calculatePKSNCF(latitude, longitude);
-    
-    // Get detailed railway line info
+    // Infos ligne ferroviaire
     const railwayInfo = await geoportal.getRailwayLineInfo(latitude, longitude);
-    
-    // Get nearby infrastructure
+    // Infrastructures proches
     const infrastructure = await geoportal.getNearbyInfrastructure(latitude, longitude, 2000);
-    
-    // Save to local data
-    let data = loadData();
-    data.locations.push({
+    // Préparation des données
+    const locationData = {
       userId,
       userName,
       latitude,
@@ -320,17 +258,19 @@ bot.on('location', async (msg) => {
       infrastructure,
       timestamp: Date.now(),
       chatId
-    });
-    
-    data.messages.push({
+    };
+    // Sauvegarde Firestore
+    await firestoreService.saveLocation(locationData);
+    // Message associé
+    await firestoreService.saveMessage({
       userId,
       userName,
       message: `📍 Position partagée - ${pkResult.pk} (${pkResult.lineName})`,
       type: 'location',
       status: 'normal',
-      location: { 
-        latitude, 
-        longitude, 
+      location: {
+        latitude,
+        longitude,
         pkSNCF: pkResult.pk,
         lineName: pkResult.lineName,
         confidence: pkResult.confidence
@@ -338,12 +278,8 @@ bot.on('location', async (msg) => {
       chatId,
       timestamp: Date.now()
     });
-    
-    saveData(data);
-    
-    // Send confirmation with detailed information
+    // Confirmation à l'utilisateur
     const geoUrl = `https://www.geoportail.gouv.fr/carte?c=${longitude},${latitude}&z=19&l=TRANSPORTNETWORKS.RAILWAYS`;
-    
     let confirmationMsg = `📍 Position reçue et traitée\n\n` +
       `📊 Coordonnées:\n` +
       `• Latitude: ${latitude.toFixed(6)}\n` +
@@ -355,38 +291,20 @@ bot.on('location', async (msg) => {
       `• Confiance: ${pkResult.confidence}\n` +
       `• Distance: ${pkResult.distance ? `${Math.round(pkResult.distance)}m` : 'N/A'}\n` +
       `• Méthode: ${pkResult.method}\n\n`;
-    
-    // Add infrastructure information if available
     if (infrastructure.stations.length > 0 || infrastructure.signals.length > 0) {
       confirmationMsg += `🏗️ Infrastructure proche:\n`;
       if (infrastructure.stations.length > 0) {
-        confirmationMsg += `• Gares: ${infrastructure.stations.length}\n`;
+        confirmationMsg += `• Gares: ${infrastructure.stations.map(s => s.name).join(', ')}\n`;
       }
       if (infrastructure.signals.length > 0) {
-        confirmationMsg += `• Signaux: ${infrastructure.signals.length}\n`;
+        confirmationMsg += `• Signaux: ${infrastructure.signals.map(s => s.type).join(', ')}\n`;
       }
-      confirmationMsg += `\n`;
     }
-    
-    confirmationMsg += `🔗 Voir sur Geoportail: ${geoUrl}`;
-    
-    bot.sendMessage(chatId, confirmationMsg, mainMenu);
-    
-    // Emit to dashboard
-    const dashboardSocket = ioClient(process.env.DASHBOARD_URL || 'http://localhost:3000', { transports: ['websocket'], reconnection: true });
-    dashboardSocket.emit('position', {
-      userId,
-      userName,
-      latitude,
-      longitude,
-      pkSNCF: pkResult ? pkResult.pk : undefined,
-      lineName: pkResult ? pkResult.lineName : undefined,
-      timestamp: Date.now()
-    });
-    
+    confirmationMsg += `\n🌐 [Voir sur carte](${geoUrl})`;
+    bot.sendMessage(chatId, confirmationMsg, { parse_mode: 'Markdown', ...mainMenu });
   } catch (error) {
-    console.error('❌ Erreur traitement localisation:', error);
-    bot.sendMessage(chatId, "❌ Erreur lors du traitement de la position. Réessayez.", mainMenu);
+    console.error('❌ Erreur traitement position:', error);
+    bot.sendMessage(chatId, "❌ Erreur lors du traitement de la position.", mainMenu);
   }
 });
 
@@ -406,12 +324,11 @@ function sendChecklist(chatId) {
 }
 
 // Handle callback queries (checklist)
-bot.on('callback_query', (query) => {
+bot.on('callback_query', async (query) => {
   const chatId = query.message.chat.id;
   const userId = query.from.id.toString();
   const userName = query.from.first_name || 'Utilisateur';
   const data = query.data;
-  
   try {
     if (data.startsWith('check')) {
       const steps = [
@@ -419,14 +336,12 @@ bot.on('callback_query', (query) => {
         { code: 'check2', label: "Contacter chef chantier" },
         { code: 'check3', label: "Activer signalisations" },
         { code: 'check4', label: "Bloquer circulation voie" },
-        { code: 'check5', label: "Confirmer mise hors voie" }
+        { code: 'check5', label: "Vérifier équipement" },
+        { code: 'check6', label: "Confirmer mise hors voie" }
       ];
-      
       const step = steps.find(s => s.code === data);
       if (step) {
-        // Save checklist action locally
-        let fullData = loadData();
-        fullData.messages.push({
+        await firestoreService.saveMessage({
           userId,
           userName,
           message: `✅ Checklist: ${step.label}`,
@@ -435,8 +350,6 @@ bot.on('callback_query', (query) => {
           chatId,
           timestamp: Date.now()
         });
-        saveData(fullData);
-        
         bot.answerCallbackQuery(query.id, { text: `✅ ${step.label} validé` });
       }
     }

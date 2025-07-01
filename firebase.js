@@ -168,6 +168,33 @@ class FirestoreService {
       throw error;
     }
   }
+
+  // Sauvegarde le ping d'un opérateur (avec position)
+  async savePing({ userId, userName, timestamp, latitude, longitude }) {
+    const ref = this.db.collection('operators').doc(userId);
+    await ref.set({
+      userId,
+      userName,
+      lastPing: timestamp,
+      latitude,
+      longitude
+    }, { merge: true });
+  }
+
+  // Récupère tous les opérateurs avec leur statut en ligne
+  async getOperatorsWithStatus() {
+    const snapshot = await this.db.collection('operators').get();
+    const now = Date.now();
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        userId: data.userId,
+        userName: data.userName,
+        lastPing: data.lastPing,
+        online: data.lastPing && (now - data.lastPing < 2 * 60 * 1000) // 2 min de tolérance
+      };
+    });
+  }
 }
 
 // Firebase Storage operations
